@@ -272,7 +272,7 @@ class Giveaways(commands.Cog):
         try:
             msg = await channel.fetch_message(int(key))
         except (discord.HTTPException, discord.NotFound, discord.Forbidden):
-            print(f"Could not fetch message {key} in {channel.name}")
+            print(f"Could not fetch message {key} in {channel.name}".encode("utf-8"))
             return
 
         self.giveaways[key]['finished'] = True
@@ -286,7 +286,7 @@ class Giveaways(commands.Cog):
                 try:
                     msg = await channel.fetch_message(int(key))
                 except (discord.HTTPException, discord.NotFound, discord.Forbidden):
-                    print(f"Could not fetch message {key} in {channel.name}")
+                    print(f"Could not fetch message {key} in {channel.name}".encode("utf-8"))
                     return
 
                 if msg:
