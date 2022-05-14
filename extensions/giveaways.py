@@ -205,7 +205,12 @@ class Giveaways(commands.Cog):
 
         guild = self.client.get_guild(data['guild_id'])
         channel = guild.get_channel(data['channel_id'])
-        msg = await channel.fetch_message(data['message_id'])
+
+        try:
+            msg = await channel.fetch_message(data['message_id'])
+        except (discord.HTTPException, discord.NotFound, discord.Forbidden):
+            await ctx.send(f"Could not fetch message {key} in {channel.name}", hidden=True)
+            return
 
         if not data["members"]:
             em = discord.Embed(color=self.client.warn, description=f"> Could not determine a new winner for this giveaway as there are no valid entrants")
@@ -257,7 +262,12 @@ class Giveaways(commands.Cog):
         guild = self.client.get_guild(data['guild_id'])
         channel = guild.get_channel(data['channel_id'])
         host = guild.get_member(data['host'])
-        msg = await channel.fetch_message(str(key))
+        
+        try:
+            msg = await channel.fetch_message(int(key))
+        except (discord.HTTPException, discord.NotFound, discord.Forbidden):
+            print(f"Could not fetch message {key} in {channel.name}")
+            return
 
         self.giveaways[key]['finished'] = True
         #if not data["members"] or len(data["members"]) == 1 or len(data['members']) <= data["winners"]    
@@ -266,7 +276,12 @@ class Giveaways(commands.Cog):
             try:
                 
                 await host.send(embed=em)
-                msg = await channel.fetch_message(int(key))
+
+                try:
+                    msg = await channel.fetch_message(int(key))
+                except (discord.HTTPException, discord.NotFound, discord.Forbidden):
+                    print(f"Could not fetch message {key} in {channel.name}")
+                    return
 
                 if msg:
                     edit_em = discord.Embed(color=self.client.failure, description=f"😔 No winners")
