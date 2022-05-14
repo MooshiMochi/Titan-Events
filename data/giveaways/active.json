@@ -1,0 +1,113 @@
+{
+  "975023563583160420": {
+    "message_id": 975023563583160420,
+    "required_role": {
+      "id": null,
+      "name": null
+    },
+    "time": 1652530544.0,
+    "winners": 1,
+    "host": 383287544336613385,
+    "members": [
+      383287544336613385
+    ],
+    "guild_id": 932736074139185292,
+    "channel_id": 975014201913409626,
+    "jump_url": "https://discord.com/channels/932736074139185292/975014201913409626/975023563583160420",
+    "finished": true,
+    "claimed": [],
+    "giveaway_winners": []
+  },
+  "975023853321453659": {
+    "message_id": 975023853321453659,
+    "required_role": {
+      "id": null,
+      "name": null
+    },
+    "time": 1652530613.0,
+    "winners": 1,
+    "host": 383287544336613385,
+    "members": [
+      383287544336613385
+    ],
+    "guild_id": 932736074139185292,
+    "channel_id": 975014201913409626,
+    "jump_url": "https://discord.com/channels/932736074139185292/975014201913409626/975023853321453659",
+    "finished": true,
+    "claimed": [
+      383287544336613385
+    ],
+    "giveaway_winners": [
+      383287544336613385
+    ]
+  },
+  "975023896338239518": {
+    "message_id": 975023853321453659,
+    "required_role": {
+      "id": null,
+      "name": null
+    },
+    "time": 1652530613.0,
+    "winners": 1,
+    "host": 383287544336613385,
+    "members": [
+      383287544336613385
+    ],
+    "guild_id": 932736074139185292,
+    "channel_id": 975014201913409626,
+    "jump_url": "https://discord.com/channels/932736074139185292/975014201913409626/975023853321453659",
+    "finished": true,
+    "claimed": [
+      383287544336613385
+    ],
+    "giveaway_winners": [
+      383287544336613385
+    ]
+  },
+  "975024059064668210": {
+    "message_id": 975024059064668210,
+    "required_role": {
+      "id": null,
+      "name": null
+    },
+    "time": 1652530662.0,
+    "winners": 1,
+    "host": 383287544336613385,
+    "members": [
+      383287544336613385
+    ],
+    "guild_id": 932736074139185292,
+    "channel_id": 975014201913409626,
+    "jump_url": "https://discord.com/channels/932736074139185292/975014201913409626/975024059064668210",
+    "finished": true,
+    "claimed": [
+      383287544336613385
+    ],
+    "giveaway_winners": [
+      383287544336613385
+    ]
+  },
+  "975024102358261780": {
+    "message_id": 975024059064668210,
+    "required_role": {
+      "id": null,
+      "name": null
+    },
+    "time": 1652530662.0,
+    "winners": 1,
+    "host": 383287544336613385,
+    "members": [
+      383287544336613385
+    ],
+    "guild_id": 932736074139185292,
+    "channel_id": 975014201913409626,
+    "jump_url": "https://discord.com/channels/932736074139185292/975014201913409626/975024059064668210",
+    "finished": true,
+    "claimed": [
+      383287544336613385
+    ],
+    "giveaway_winners": [
+      383287544336613385
+    ]
+  }
+}

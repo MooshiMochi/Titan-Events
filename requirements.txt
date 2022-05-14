@@ -1,0 +1,5 @@
+aiohttp<3.8.0
+asyncio
+discord.py
+discord-py-interactions<4.0.0
+python-dotenv
