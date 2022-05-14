@@ -119,7 +119,7 @@ class MyClient(commands.Bot):
 
     async def on_ready(self):
         self.logger.info(f"Logged in as {self.user}: {self.user.id}")
-        await self.change_presence(status=discord.Status.online, activity=discord.Game(name="titanmc.gg"))
+        await self.change_presence(status=discord.Status.online, activity=discord.Game(name="titanmc.events"))
     
     @staticmethod
     async def format_duration(ts_duration: str):

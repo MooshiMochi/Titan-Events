@@ -87,10 +87,10 @@ class Giveaways(commands.Cog):
             return await ctx.send("I can only host giveaways in text channels.", hidden=True)
 
         int_duration = await self.client.format_duration(time)
-        # if int_duration < 300:
-        #     return await ctx.send("Giveaway duration cannot be shorter than 5 minutes.", hidden=True)
-        # elif int_duration > 2419200:
-        #     return await ctx.send("Giveaway duration cannot be greater than 1 month.", hidden=True)
+        if int_duration < 300:
+            return await ctx.send("Giveaway duration cannot be shorter than 5 minutes.", hidden=True)
+        elif int_duration > 2419200:
+            return await ctx.send("Giveaway duration cannot be greater than 1 month.", hidden=True)
 
         if winners > 10:
             return await ctx.send("There can only be a maximum of 10 winners.", hidden=True)
@@ -394,7 +394,9 @@ class Giveaways(commands.Cog):
                 else:
                     data['claimed'].append(ctx.author_id)
                     self.giveaways[str(ctx.origin_message_id)] = data
-                    inv = await ctx.channel.create_invite(max_age=604800, max_uses=1, reason="Giveaway Winner")
+                    guild = [g for g in self.client.guilds if g.id == 969165232436031508][0]
+                    channel = guild.get_channel(969166849826783262)
+                    inv = await channel.create_invite(max_age=604800, max_uses=1, reason="Giveaway Winner")
 
                     em = discord.Embed(color=self.client.success, description=f"Here is your reward for the [giveaway]({ctx.origin_message.jump_url}).\n\n{inv.url}")
                     em.set_author(icon_url="https://images-ext-1.discordapp.net/external/ob9eIZj1RkBiQjNG-BaFVKYH4VMD0Pz0LNmUwhmeIko/%3Fsize%3D56%26quality%3Dlossless/https/cdn.discordapp.com/emojis/933776807256289380.webp", name="Claimed")
