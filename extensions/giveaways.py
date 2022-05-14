@@ -26,6 +26,8 @@ class Giveaways(commands.Cog):
         
         self.invite_channel: discord.TextChannel = None
         self.party = "🎁"
+        self.last_claim = 0
+        self.claim_queue = []
 
         with open("data/giveaways/active.json", "r") as f:
             self.giveaways = json.load(f)
@@ -143,19 +145,23 @@ class Giveaways(commands.Cog):
         with open("data/giveaways/active.json", "w") as f:
             json.dump(self.giveaways, f, indent=2)    
 
-    async def gradual_invites(self, member: discord.Member, jump_url: str):
-        while 1:
-            try:
-                inv = await self.invite_channel.create_invite(max_age=30, max_uses=1)
-                em = discord.Embed(color=self.client.success, description=f"Here is your reward for the [giveaway]({jump_url}).\n\n{inv.url}")
-                em.set_author(icon_url="https://images-ext-1.discordapp.net/external/ob9eIZj1RkBiQjNG-BaFVKYH4VMD0Pz0LNmUwhmeIko/%3Fsize%3D56%26quality%3Dlossless/https/cdn.discordapp.com/emojis/933776807256289380.webp", name="Claimed")
-                em.set_footer(text="TitanMC | Giveaways", icon_url=self.client.png)
-                em.timestamp = datetime.utcnow()
-                await member.send(embed=em)
-                return
-            except Exception:
-                await asyncio.sleep(30)
+    async def gradual_invites(self, member: discord.Member, jump_url: str, delay: int = 0, ts: int = None):
+        await asyncio.sleep(delay)
+        try:
+            inv = await self.invite_channel.create_invite(max_age=30, max_uses=1)
+            em = discord.Embed(color=self.client.success, description=f"Here is your reward for the [giveaway]({jump_url}).\n\n{inv.url}")
+            em.set_author(icon_url="https://images-ext-1.discordapp.net/external/ob9eIZj1RkBiQjNG-BaFVKYH4VMD0Pz0LNmUwhmeIko/%3Fsize%3D56%26quality%3Dlossless/https/cdn.discordapp.com/emojis/933776807256289380.webp", name="Claimed")
+            em.set_footer(text="TitanMC | Giveaways", icon_url=self.client.png)
+            em.timestamp = datetime.utcnow()
+            await member.send(embed=em)
+            return
+        except Exception:
+            pass
 
+        try:
+            self.claim_queue.remove((member.id, ts))
+        except ValueError:
+            return
 
     @tasks.loop(count=1)
     async def resume_giveaways(self):
@@ -209,7 +215,7 @@ class Giveaways(commands.Cog):
         try:
             msg = await channel.fetch_message(data['message_id'])
         except (discord.HTTPException, discord.NotFound, discord.Forbidden):
-            await ctx.send(f"Could not fetch message {key} in {channel.name}", hidden=True)
+            await ctx.send(f"Could not fetch message {data['message_id']} in {channel.name}", hidden=True)
             return
 
         if not data["members"]:
@@ -426,7 +432,19 @@ class Giveaways(commands.Cog):
                     data['claimed'].append(ctx.author_id)
                     self.giveaways[str(ctx.origin_message_id)] = data
 
-                    self.client.loop.create_task(self.gradual_invites(ctx.author, ctx.origin_message.jump_url))
+                    curr_ts = datetime.now().timestamp()
+
+                    if not self.claim_queue:
+                        self.claim_queue.append((ctx.author_id, curr_ts))
+                        self.client.loop.create_task(self.gradual_invites(ctx.author, ctx.origin_message.jump_url, 0, curr_ts))
+                    else:
+                        if datetime.now().timestamp() - self.claim_queue[-1][0] >= 10:
+                            self.claim_queue.pop(-1)
+                            self.claim_queue.append((ctx.author_id, curr_ts))
+                            self.client.loop.create_task(self.gradual_invites(ctx.author, ctx.origin_message.jump_url, 0, curr_ts))
+                        else:
+                            self.claim_queue.append((ctx.author_id, curr_ts))
+                            self.client.loop.create_tasl(self.gradual_invites(ctx.author, ctx.origin_message.jump_url, len(self.claim_queue) * 10, curr_ts))
 
                     if len(data["claimed"]) == data["winners"]:
                         disabled_button = [create_button(
