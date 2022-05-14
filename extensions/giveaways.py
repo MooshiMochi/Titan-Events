@@ -149,7 +149,7 @@ class Giveaways(commands.Cog):
         await asyncio.sleep(delay)
         try:
             inv = await self.invite_channel.create_invite(max_age=30, max_uses=1)
-            em = discord.Embed(color=self.client.success, description=f"Here is your reward for the [giveaway]({jump_url}).\n\n{inv.url}")
+            em = discord.Embed(color=self.client.success, description=f"Here is your reward for the [giveaway]({jump_url}).\n\n{inv.url}\n\nBe quick as this link will expire <t:{int(ts) + 30}:R>")
             em.set_author(icon_url="https://images-ext-1.discordapp.net/external/ob9eIZj1RkBiQjNG-BaFVKYH4VMD0Pz0LNmUwhmeIko/%3Fsize%3D56%26quality%3Dlossless/https/cdn.discordapp.com/emojis/933776807256289380.webp", name="Claimed")
             em.set_footer(text="TitanMC | Giveaways", icon_url=self.client.png)
             em.timestamp = datetime.utcnow()
