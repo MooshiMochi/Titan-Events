@@ -438,13 +438,8 @@ class Giveaways(commands.Cog):
                         self.claim_queue.append((ctx.author_id, curr_ts))
                         self.client.loop.create_task(self.gradual_invites(ctx.author, ctx.origin_message.jump_url, 0, curr_ts))
                     else:
-                        if datetime.now().timestamp() - self.claim_queue[-1][0] >= 10:
-                            self.claim_queue.pop(-1)
-                            self.claim_queue.append((ctx.author_id, curr_ts))
-                            self.client.loop.create_task(self.gradual_invites(ctx.author, ctx.origin_message.jump_url, 0, curr_ts))
-                        else:
-                            self.claim_queue.append((ctx.author_id, curr_ts))
-                            self.client.loop.create_tasl(self.gradual_invites(ctx.author, ctx.origin_message.jump_url, len(self.claim_queue) * 30, curr_ts))
+                        self.claim_queue.append((ctx.author_id, curr_ts))
+                        self.client.loop.create_tasl(self.gradual_invites(ctx.author, ctx.origin_message.jump_url, len(self.claim_queue) * 30, curr_ts))
 
                     if len(data["claimed"]) == data["winners"]:
                         disabled_button = [create_button(
