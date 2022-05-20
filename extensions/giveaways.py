@@ -108,6 +108,7 @@ class Giveaways(commands.Cog):
         em.description += f"\n<:lunar_dot:943374901748846602> Ends: <t:{int(datetime.now().timestamp() + int_duration)}:R>"
         em.description += f"\n\n**Prize**: __Event Server Invite__"
         em.description += f"\n\nClick the button below to enter the raffle!"
+        em.description += f"\n\nIf you're in the TitanMC server, you get 2x entries!"
         
         action_row = create_actionrow(*self.enter_buttons)
 
@@ -148,11 +149,11 @@ class Giveaways(commands.Cog):
     async def gradual_invites(self, member: discord.Member, jump_url: str, delay: int = 0, ts: int = None):
         await asyncio.sleep(delay)
         try:
-            inv = await self.invite_channel.create_invite(max_age=30, max_uses=1)
-            em = discord.Embed(color=self.client.success, description=f"Here is your reward for the [raffle]({jump_url}).\n\n{inv.url}\n\nBe quick as this link will expire <t:{int(ts) + 30}:R>")
+            inv = await self.invite_channel.create_invite(max_age=300, max_uses=1)
+            em = discord.Embed(color=self.client.success, description=f"Here is your reward for the [raffle]({jump_url}).\n\n{inv.url}\n\nBe quick as this link will expire <t:{int(datetime.now()) + 300}:R>")
             em.set_author(icon_url="https://images-ext-1.discordapp.net/external/ob9eIZj1RkBiQjNG-BaFVKYH4VMD0Pz0LNmUwhmeIko/%3Fsize%3D56%26quality%3Dlossless/https/cdn.discordapp.com/emojis/933776807256289380.webp", name="Claimed")
             em.set_footer(text="TitanMC | Raffles", icon_url=self.client.png)
-            em.timestamp = datetime.utcnow()
+            em.timestamp = datetime.now()
             await member.send(embed=em)
             return
         except Exception:
@@ -457,9 +458,9 @@ class Giveaways(commands.Cog):
                         self.client.loop.create_task(self.gradual_invites(ctx.author, ctx.origin_message.jump_url, 0, curr_ts))
                     else:
                         self.claim_queue.append((ctx.author_id, curr_ts))
-                        self.client.loop.create_task(self.gradual_invites(ctx.author, ctx.origin_message.jump_url, len(self.claim_queue) * 30, curr_ts))
+                        self.client.loop.create_task(self.gradual_invites(ctx.author, ctx.origin_message.jump_url, len(self.claim_queue) * 300, curr_ts))
 
-                    ___em = discord.Embed(description=f"You have been added to the invite queue.\n\nYou will be notified when your invite is ready.\n`ETA: {len(self.claim_queue) * 0.5} minutes`")
+                    ___em = discord.Embed(description=f"You have been added to the invite queue.\n\nYou will be notified when your invite is ready.\n`ETA: {len(self.claim_queue) * 5} minutes`")
                     await ctx.send(embed=___em, hidden=True)
 
                     if len(data["claimed"]) == data["winners"]:

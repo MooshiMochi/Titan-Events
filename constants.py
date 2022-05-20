@@ -9,6 +9,6 @@ class Constants:
             "extensions.restricted"
         ]
 
-        self.slash_guild_ids = [self.guild_id]
+        self.slash_guild_ids = [self.guild_id, 734890828698353704]
 
 const = Constants()
