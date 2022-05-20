@@ -452,6 +452,9 @@ class Giveaways(commands.Cog):
                         self.claim_queue.append((ctx.author_id, curr_ts))
                         self.client.loop.create_task(self.gradual_invites(ctx.author, ctx.origin_message.jump_url, len(self.claim_queue) * 30, curr_ts))
 
+                    ___em = discord.Embed(description=f"You have been added to the invite queue.\n\nYou will be notified when your invite is ready.\n`ETA: {len(self.claim_queue) * 0.5} minutes`")
+                    await ctx.send(embed=___em, hidden=True)
+
                     if len(data["claimed"]) == data["winners"]:
                         disabled_button = [create_button(
                             label="Claim.",
