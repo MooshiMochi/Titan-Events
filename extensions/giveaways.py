@@ -304,6 +304,13 @@ class Giveaways(commands.Cog):
             return
         
         try:
+            titan_mc_guild = self.client.get_guild(932413718397083678)
+            if titan_mc_guild is not None:
+                titan_mc_members = [m.id for m in titan_mc_guild.members]
+                for m_id in data['members'].copy():
+                    if m_id in titan_mc_members:
+                        data['members'].append(m_id)
+
             winners = random.sample(data['members'], data['winners'])
         except ValueError:
             winners = data['members']
