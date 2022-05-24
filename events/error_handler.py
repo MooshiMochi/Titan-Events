@@ -29,13 +29,27 @@ class ErrorHandler(commands.Cog):
         error = getattr(error, "original", error)
 
 
-        if isinstance(error, discord.NotFound) or isinstance(error, discord.Forbidden):
+        if isinstance(error, discord.NotFound):
             # probably because a message got deleted, so we'll ignore it.
 
             try:
                 self.client.slash.commands[ctx.command].reset_cooldown(ctx)
             except AttributeError:
                 pass
+        elif isinstance(error, discord.Forbidden):
+            try:
+                self.client.slash.commands[ctx.command].reset_cooldown(ctx)
+            except AttributeError:
+                pass
+            embed = discord.Embed(title="I can't do that.",
+                                  description=f"Sorry, there is an error because I don't have enough access." +
+                                               "\nPlease contact a server " +
+                                               "administrator to fix this issue.",
+                                  color=self.client.failure)
+            try:
+                return await ctx.embed(embed)
+            except discord.HTTPException:
+                return
 
         elif isinstance(error, Error.RequestFailure):
             try:

@@ -16,6 +16,7 @@ from discord_slash.error import AlreadyResponded
 from dotenv import load_dotenv
 
 from constants import const
+from database import DB
 
 load_dotenv()
 
@@ -97,21 +98,19 @@ class MyClient(commands.Bot):
         self.success = 0x00FF00
         self.failure = 0xff0000
         self.warn = 0xffff00
-
         self.no = "❌"
         self.yes = "✅"
 
         self.config = BotConfig(const.log_channel_id)
-
         self.owner_ids = {383287544336613385}
+        self.db: DB = DB(self)
+        self.db.initialise()
 
     async def get_context(self, message, *, cls=TNContext):
-        # override get_context
         return await super().get_context(message, cls=cls)
 
     async def on_connect(self):
-        self.session = aiohttp.ClientSession()
-    
+        self.session = aiohttp.ClientSession()    
 
     async def close(self):
         await self.session.close()
@@ -198,24 +197,17 @@ class MyClient(commands.Bot):
 
     @staticmethod
     async def parse_int(string_amount:str):
-        
         clean_content = string_amount.replace(" ", "").replace(",", "").lower()
-
         if clean_content.endswith("k"):
             rv = float(clean_content.replace("k", "")) * 1e3
-
         elif clean_content.endswith("m"):
             rv = float(clean_content.replace("m", "")) * 1e6
-
         elif clean_content.endswith("b"):
             rv = float(clean_content.replace("b", "")) * 1e9
-
         elif clean_content.endswith("t"):
             rv = float(clean_content.replace("t", "")) * 1e12
-
         else:
             rv = float(clean_content)
-
         return rv
 
 
@@ -313,6 +305,6 @@ async def unload(ctx, filename):
 
 client.logger.info("Logging in...")
 loop = asyncio.get_event_loop()
-loop.set_debug(True)
+loop.set_debug(const.DEBUG)
 loop.create_task(client.run(TOKEN))
 loop.run_forever()

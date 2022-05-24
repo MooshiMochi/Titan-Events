@@ -3,3 +3,4 @@ asyncio
 discord.py
 discord-py-interactions<4.0.0
 python-dotenv
+aiofiles==0.6.0

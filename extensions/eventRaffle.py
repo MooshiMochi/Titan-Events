@@ -1,6 +1,10 @@
+from __future__ import annotations
+from typing import TYPE_CHECKING
+if TYPE_CHECKING:
+    from main import MyClient
+
 import discord
 import asyncio
-import json
 import random
 
 from discord import AllowedMentions
@@ -18,24 +22,23 @@ from datetime import datetime
 from constants import const
 
 
-class Giveaways(commands.Cog):
+class EventRaffle(commands.Cog):
 
 
     def __init__(self, client):
-        self.client = client
+        self.client: MyClient = client
         
-        self.invite_channel: discord.TextChannel = None
         self.party = "🎁"
         self.last_claim = 0
         self.claim_queue = []
 
-        with open("data/giveaways/active.json", "r") as f:
-            self.giveaways = json.load(f)
-
+        self.raffles = self.client.db.raffles
+        # with open("data/raffles/active.json", "r") as f:
+        #     self.raffles = json.load(f)
 
         self.timeout_button = [create_button(
         style=ButtonStyle.red,
-        label="Giveaway Ended!",
+        label="Raffle Ended!",
         emoji="🎉", 
         disabled=True)]
 
@@ -44,7 +47,7 @@ class Giveaways(commands.Cog):
                 label="Enter", 
                 emoji="🎉", 
                 style=ButtonStyle.green,
-                custom_id="giveaway_enter")
+                custom_id="raffle_enter")
         ]
 
         self.claim_buttom = [
@@ -52,13 +55,13 @@ class Giveaways(commands.Cog):
                 label="Claim",
                 emoji="🎉",
                 style=ButtonStyle.green,
-                custom_id="giveaway_claim")
+                custom_id="raffle_claim")
         ]
 
         self.claim_component = [create_actionrow(*self.claim_buttom)]
         self.timeout_components = [create_actionrow(*self.timeout_button)]
 
-        self.resume_giveaways.start()
+        self.resume_raffles.start()
 
     @cog_slash(
         name="raffle", 
@@ -76,6 +79,16 @@ class Giveaways(commands.Cog):
     @commands.guild_only()
     @commands.has_permissions(manage_roles=True, manage_messages=True)
     async def raffle(self, ctx:SlashContext, channel:discord.TextChannel=None, title:str=None, time:str=None, winners:int=1, required_role:discord.Role=None, ping_role_1:discord.Role=None, ping_role_2:discord.Role=None, ping_role_3:discord.Role=None):
+        
+        await ctx.defer(hidden=True)
+
+        guild = self.client.get_guild(self.client.db.settings["raffle_server"])
+        if guild:
+            role = guild.get_role(self.client.db.settings["raffle_role"])
+            if role:
+                if len(role.members) > 0:
+                    await ctx.send("An event is already ongoing. Please use `/end_event` to end the event.", hidden=True)
+                    return
 
         pings = "|| "
         pings += ping_role_1.mention if ping_role_1 else ""
@@ -95,8 +108,8 @@ class Giveaways(commands.Cog):
         elif int_duration > 2419200:
             return await ctx.send("Raffle duration cannot be greater than 1 month.", hidden=True)
 
-        if winners > 150:
-            return await ctx.send("There can only be a maximum of 150 winners.", hidden=True)
+        if winners > 100:
+            return await ctx.send("There can only be a maximum of 100 winners.", hidden=True)
 
         if winners < 1:
             return await ctx.send("There can only be a minimum of 1 winner.", hidden=True)
@@ -108,7 +121,7 @@ class Giveaways(commands.Cog):
         em.description += f"\n<:lunar_dot:943374901748846602> Ends: <t:{int(datetime.now().timestamp() + int_duration)}:R>"
         em.description += f"\n\n**Prize**: __Event Server Invite__"
         em.description += f"\n\nClick the button below to enter the raffle!"
-        em.description += f"\n\nIf you're in the TitanMC server, you get 2x entries!"
+        em.description += f"\n\nIf you're in the TitanMC server, you get 2x entries!\nhttps://discord.gg/titanmc"
         
         action_row = create_actionrow(*self.enter_buttons)
 
@@ -116,13 +129,16 @@ class Giveaways(commands.Cog):
             msg = await channel.send(content=f"{self.party} **RAFFLE** {self.party} {pings}", embed=em, components=[action_row], allowed_mentions=AllowedMentions(roles=True))
         except discord.HTTPException:
             return await ctx.send("I do not have enough permissions to create a raffle in that channel.", hidden=True)
+        
+        for msg_id in self.raffles:
+            self.raffles[msg_id]["latest"] = False
 
-        self.giveaways[str(msg.id)] = {
+        self.raffles[str(msg.id)] = {
             "message_id": msg.id,
             "required_role": {
                 'id': required_role.id if required_role else None,
                 'name': required_role.name if required_role else None},
-            "time": int(datetime.utcnow().timestamp()) + int_duration,
+            "time": int(datetime.now().timestamp()) + int_duration,
             "winners": winners,
             "host": ctx.author_id,
             "members": [],
@@ -131,30 +147,47 @@ class Giveaways(commands.Cog):
             "jump_url": msg.jump_url,
             "finished": False,
             "claimed": [],
-            "giveaway_winners": []
+            "raffle_winners": [],
+            "latest": True,
         }
-
-        with open("data/giveaways/active.json", "w") as f:
-            json.dump(self.giveaways, f, indent=2)
 
         await ctx.send(f"Success!", hidden=True)
 
-        self.client.loop.create_task(self.wait_for_giveaway(str(msg.id)))
+        self.client.loop.create_task(self.wait_for_raffle(str(msg.id)))
 
-    @tasks.loop(seconds=15.0)
-    async def save_giveaways(self):
-        with open("data/giveaways/active.json", "w") as f:
-            json.dump(self.giveaways, f, indent=2)    
+    @cog_slash(name="end_event", description="End the event and remove server access from regular members.", guild_ids=const.slash_guild_ids)
+    async def end_event(self, ctx: SlashContext):
+        if not ctx.author.guild_permissions.administrator:
+            raise commands.MissingPermissions("administrator")
+
+        await ctx.defer(hidden=True)
+        
+        guild = self.client.db.settings["raffle_server"]
+        guild: discord.Guild = self.client.get_guild(guild)
+        if not guild:
+            return await ctx.send("I can't find the raffle server.", hidden=True)
+        role: discord.Role = guild.get_role(self.client.db.settings["raffle_role"])
+        if not role:
+            return await ctx.send("I can't find the raffle role.", hidden=True)
+        
+        if len(role.members) == 0:
+            return await ctx.send("No regular members have access to the server channels.", hidden=True)
+
+        em = discord.Embed(color=self.client.failure, description="Started remove server access from regular members.", title="🎉 Event Ended 🎉")
+        await ctx.send(embed=em, hidden=True)
+
+        for member in role.members:
+            await member.remove_roles(role)
+
 
     async def gradual_invites(self, member: discord.Member, jump_url: str, delay: int = 0, ts: int = None):
         await asyncio.sleep(delay)
         try:
-            inv = await self.invite_channel.create_invite(max_age=300, max_uses=1)
-            em = discord.Embed(color=self.client.success, description=f"Here is your reward for the [raffle]({jump_url}).\n\n{inv.url}\n\nBe quick as this link will expire <t:{int(datetime.now()) + 300}:R>")
+            em = discord.Embed(color=self.client.success, description=f"Here is your reward for the [raffle]({jump_url}).\n\n{self.client.db.settings['invite_link']}")
             em.set_author(icon_url="https://images-ext-1.discordapp.net/external/ob9eIZj1RkBiQjNG-BaFVKYH4VMD0Pz0LNmUwhmeIko/%3Fsize%3D56%26quality%3Dlossless/https/cdn.discordapp.com/emojis/933776807256289380.webp", name="Claimed")
             em.set_footer(text="TitanMC | Raffles", icon_url=self.client.png)
             em.timestamp = datetime.now()
-            await member.send(embed=em)
+            await member.send(embed=em, delete_after=6*60*60)
             return
         except Exception:
             pass
@@ -165,33 +198,26 @@ class Giveaways(commands.Cog):
             return
 
     @tasks.loop(count=1)
-    async def resume_giveaways(self):
-        
-        guild = [g for g in self.client.guilds if g.id == 969165232436031508][0]
-        self.invite_channel: discord.TextChannel = guild.get_channel(969166849826783262)
-
-        self.save_giveaways.start()
-
-        ts = datetime.utcnow().timestamp()
+    async def resume_raffles(self):        
+        ts = datetime.now().timestamp()
 
         tasks = []
-        for key in self.giveaways.keys():
-            if self.giveaways[key]["time"] < ts:
-                tasks.append(self.wait_for_giveaway(key))
+        for key in self.raffles.keys():
+            if self.raffles[key]["time"] < ts:
+                tasks.append(self.wait_for_raffle(key))
         if tasks:
             await asyncio.gather(*tasks)
 
     @tasks.loop(minutes=5)
-    async def clear_giveaway_cache(self):
-        ts = datetime.utcnow().timestamp()
-        for key in self.giveaways.copy().keys():
-            if ts - self.giveaways[key]["time"] >= 24*60*60:
-                self.giveaways.pop(key, None)
-        
-    @resume_giveaways.before_loop
-    @save_giveaways.before_loop
-    @clear_giveaway_cache.before_loop
-    async def before_resuming_giveaways(self):
+    async def clear_raffle_cache(self):
+        ts = datetime.now().timestamp()
+        for key in self.raffles.copy().keys():
+            if ts - self.raffles[key]["time"] >= 24*60*60:
+                self.raffles.pop(key, None)
+
+    @resume_raffles.before_loop
+    @clear_raffle_cache.before_loop
+    async def before_resuming_raffles(self):
         await self.client.wait_until_ready()
 
 
@@ -203,7 +229,7 @@ class Giveaways(commands.Cog):
     async def raffle_reroll(self, ctx:SlashContext, message_id:str=None):
         await ctx.defer(hidden=True)
     
-        data = self.giveaways.get(message_id, None)
+        data = self.raffles.get(message_id, None)
         if not data:
             return await ctx.send("It looks like that raffle no longer exists. Sorry, but you cannot re-roll this raffle", hidden=True)
         
@@ -239,7 +265,7 @@ class Giveaways(commands.Cog):
         except ValueError:
             winners = data['members']
 
-        data["giveaway_winners"] = winners
+        data["raffle_winners"] = winners
 
         public_em = discord.Embed(color=self.client.warn, description=f"You have won a [raffle]({data['jump_url']}) for **1 Entry to Events Server**!")
 
@@ -255,16 +281,18 @@ class Giveaways(commands.Cog):
         return await ctx.send(embed=em, hidden=True)
     
 
-    async def wait_for_giveaway(self, key:str):
+    async def wait_for_raffle(self, key:str):
         await self.client.wait_until_ready()
 
-        data = self.giveaways[key]
+        data = self.raffles[key]
 
-        if self.giveaways[key]['finished']:
+        if self.raffles[key]['finished']:
             return
 
-        if datetime.utcnow().timestamp() < data["time"]:
-            await discord.utils.sleep_until(datetime.fromtimestamp(data["time"]))
+        if datetime.now().timestamp() < data["time"]:
+            print(datetime.fromtimestamp(data['time']))
+            await asyncio.sleep(data["time"] - datetime.now().timestamp())
+            # await discord.utils.sleep_until(datetime.fromtimestamp(data["time"]))
         
         guild = self.client.get_guild(data['guild_id'])
         channel = guild.get_channel(data['channel_id'])
@@ -276,7 +304,7 @@ class Giveaways(commands.Cog):
             print(f"Could not fetch message {key} in {channel.name}".encode("utf-8"))
             return
 
-        self.giveaways[key]['finished'] = True
+        self.raffles[key]['finished'] = True
         #if not data["members"] or len(data["members"]) == 1 or len(data['members']) <= data["winners"]    
         if not data["members"]:
             em = discord.Embed(color=self.client.warn, description=f"[Your raffle]({data['jump_url']}) ended without any winners.")
@@ -301,7 +329,7 @@ class Giveaways(commands.Cog):
 
             except discord.HTTPException:
                 pass
-            # self.giveaways.pop(key, None)
+            # self.raffles.pop(key, None)
             return
         
         try:
@@ -316,7 +344,9 @@ class Giveaways(commands.Cog):
         except ValueError:
             winners = data['members']
         
-        data["giveaway_winners"] = winners
+        data["raffle_winners"] = winners
+
+        self.client.loop.create_task(self.add_participant_role_to_winners_if_in_server_already(winners))
 
         public_em = discord.Embed(color=self.client.warn, description=f"You have won a [raffle]({data['jump_url']}) for **1 Event Server Invite**!")
 
@@ -361,24 +391,34 @@ class Giveaways(commands.Cog):
                 await msg.edit(content=f"{self.party}**RAFFLE ENDED**{self.party}", embed=edit_em, components=self.timeout_components)
             except discord.HTTPException:
                 pass
-        # self.giveaways.pop(key, None)
+        # self.raffles.pop(key, None)
         return
+
+    async def add_participant_role_to_winners_if_in_server_already(self, winners: list):
+        guild = self.client.get_guild(self.client.db.settings["raffle_server"])
+        if guild:
+            role = guild.get_role(self.client.db.settings["raffle_role"])
+            if role:
+                for winner_id in winners:
+                    mem = guild.get_member(winner_id)
+                    if mem:
+                        await mem.add_roles(role)
 
     @commands.Cog.listener()
     async def on_component(self, ctx:ComponentContext):
         await self.client.wait_until_ready()
 
-        if ctx.custom_id == "giveaway_enter":
+        if ctx.custom_id == "raffle_enter":
 
-            data = self.giveaways.get(str(ctx.origin_message_id), None)
-            if not data or datetime.utcnow().timestamp() >= data['time']:
+            data = self.raffles.get(str(ctx.origin_message_id), None)
+            if not data or datetime.now().timestamp() >= data['time']:
                 
                 edit_em = discord.Embed(color=self.client.warn, description=f"An error occured.\n\nThis raffle is cancelled.")
                 edit_em.set_author(name="1 Event Server Invite" if data else "Unknown", icon_url="https://media.discordapp.net/attachments/884145972995825724/934498580885041222/PRESENT.png")
                 edit_em.set_footer(text="TitanMC | Raffles", icon_url=self.client.png)
 
                 try:
-                    await ctx.edit_origin(content=f"{self.party}**RAFFLE ENDED**{self.party}", embed=edit_em, components=self.timeout_components)
+                    await ctx.send(content=f"{self.party}**RAFFLE ENDED**{self.party}", embed=edit_em, components=self.timeout_components)
                 except:
                     pass
                 return
@@ -390,33 +430,33 @@ class Giveaways(commands.Cog):
                     em = discord.Embed(color=self.client.success, description=f"Your entry into this [raffle]({ctx.origin_message.jump_url}) has been approved.")
                     em.set_author(icon_url="https://images-ext-1.discordapp.net/external/ob9eIZj1RkBiQjNG-BaFVKYH4VMD0Pz0LNmUwhmeIko/%3Fsize%3D56%26quality%3Dlossless/https/cdn.discordapp.com/emojis/933776807256289380.webp", name="Entry Approved")
                     em.set_footer(text="TitanMC | Raffles", icon_url=self.client.png)
-                    em.timestamp = datetime.utcnow()
+                    em.timestamp = datetime.now()
                     await ctx.author.send(embed=em)
-                    self.giveaways[str(ctx.origin_message_id)]['members'].append(ctx.author_id)
-                    self.giveaways[str(ctx.origin_message_id)]["members"] = list(set(data['members']))
+                    self.raffles[str(ctx.origin_message_id)]['members'].append(ctx.author_id)
+                    self.raffles[str(ctx.origin_message_id)]["members"] = list(set(data['members']))
                 
                 else:
-
                     em = discord.Embed(color=self.client.failure, description=f"To enter this [raffle]({ctx.origin_message.jump_url}) you need the following role:\n**{data['required_role']['name']}**")
                     em.set_author(icon_url="https://media.discordapp.net/attachments/884145972995825724/933799302491406377/Denied.png", name="Entry Denied")
                     em.set_footer(text="TitanMC | Raffles", icon_url=self.client.png)
-                    em.timestamp = datetime.utcnow()
+                    em.timestamp = datetime.now()
                     await ctx.author.send(embed=em)
                     return
             else:
                 if ctx.author_id in data['members']:
                     return await ctx.send("You are already in this raffle.", hidden=True)
-                em = discord.Embed(color=self.client.success, description=f"Your entry into this [raffle]({ctx.origin_message.jump_url}) has been approved.")
+                em = discord.Embed(color=self.client.success, description=f"Your entry into this [raffle]({ctx.origin_message.jump_url}) has been approved.\n\n**Note:** If you are in the TitanMC server, you get 2x chance of winning.\nhttps://discord.gg/titanmc")
                 em.set_author(icon_url="https://images-ext-1.discordapp.net/external/ob9eIZj1RkBiQjNG-BaFVKYH4VMD0Pz0LNmUwhmeIko/%3Fsize%3D56%26quality%3Dlossless/https/cdn.discordapp.com/emojis/933776807256289380.webp", name="Entry Approved")
                 em.set_footer(text="TitanMC | Raffles", icon_url=self.client.png)
-                em.timestamp = datetime.utcnow()
+                em.timestamp = datetime.now()
                 try:
                     await ctx.author.send(embed=em)
-                except discord.Forbidden:
-                    pass
+                except discord.Forbidden as e:
+                    if const.DEBUG:
+                        print(e)
                 
-                self.giveaways[str(ctx.origin_message_id)]['members'].append(ctx.author_id)
-                self.giveaways[str(ctx.origin_message_id)]["members"] = list(set(data['members']))
+                self.raffles[str(ctx.origin_message_id)]['members'].append(ctx.author_id)
+                self.raffles[str(ctx.origin_message_id)]["members"] = list(set(data['members']))
 
             participants = [create_button(
                 label=f"{len(data['members'])} Participant(s)",
@@ -430,9 +470,11 @@ class Giveaways(commands.Cog):
                 await ctx.edit_origin(content=ctx.origin_message.content, embed=ctx.origin_message.embeds[0], components=new_ar)
             except:
                 pass
-        elif ctx.custom_id == "giveaway_claim":
-            ## Create an invite link to the server and DM it to the user if they are a winner of the giveaway and have not claimed already
-            data = self.giveaways.get(str(ctx.origin_message.reference.message_id), None)
+        
+        elif ctx.custom_id == "raffle_claim":
+            ## Create an invite link to the server and DM it to the user if they are a winner of the raffle and have not claimed already
+
+            data = self.raffles.get(str(ctx.origin_message.reference.message_id), None)
             if not data or datetime.now().timestamp() >= data['time'] + dt.timedelta(weeks=1).total_seconds():
                 edit_em = discord.Embed(color=self.client.warn, description=f"An error occured.\n\nThis raffle is cancelled.")
                 edit_em.set_author(name="1 Event Server Invite" if data else "Unknown", icon_url="https://media.discordapp.net/attachments/884145972995825724/934498580885041222/PRESENT.png")
@@ -440,16 +482,17 @@ class Giveaways(commands.Cog):
 
                 try:
                     await ctx.edit_origin(content=f"{self.party}**RAFFLE ENDED**{self.party}", embed=edit_em, components=self.timeout_components)
-                except:
-                    pass
+                except Exception as e:
+                    if const.DEBUG:
+                        print("Failed to edit message\n", e)
                 return
 
-            if ctx.author_id in data['giveaway_winners']:
+            if ctx.author_id in data['raffle_winners']:
                 if ctx.author_id in data['claimed']:
                     return await ctx.send("You have already claimed this raffle.", hidden=True)
                 else:
                     data['claimed'].append(ctx.author_id)
-                    self.giveaways[str(ctx.origin_message_id)] = data
+                    self.raffles[str(ctx.origin_message_id)] = data
 
                     curr_ts = datetime.now().timestamp()
 
@@ -458,9 +501,9 @@ class Giveaways(commands.Cog):
                         self.client.loop.create_task(self.gradual_invites(ctx.author, ctx.origin_message.jump_url, 0, curr_ts))
                     else:
                         self.claim_queue.append((ctx.author_id, curr_ts))
-                        self.client.loop.create_task(self.gradual_invites(ctx.author, ctx.origin_message.jump_url, len(self.claim_queue) * 300, curr_ts))
+                        self.client.loop.create_task(self.gradual_invites(ctx.author, ctx.origin_message.jump_url, len(self.claim_queue) * 2, curr_ts))
 
-                    ___em = discord.Embed(description=f"You have been added to the invite queue.\n\nYou will be notified when your invite is ready.\n`ETA: {len(self.claim_queue) * 5} minutes`")
+                    ___em = discord.Embed(description=f"You have been added to the invite queue.\n\nYou will be notified when your invite is ready.\n`ETA: {len(self.claim_queue) * 2} seconds`")
                     await ctx.send(embed=___em, hidden=True)
 
                     if len(data["claimed"]) == data["winners"]:
@@ -480,4 +523,4 @@ class Giveaways(commands.Cog):
                 return await ctx.send("You are not in this raffle.", hidden=True)
 
 def setup(client):
-    client.add_cog(Giveaways(client))
+    client.add_cog(EventRaffle(client))
